@@ -3,9 +3,10 @@
 #include "workouts.h"
 #include "lcd.h"
 
+//bzucak
 const int BUZZER_PIN = 10;
 
-// Definice pinů pro tlačítka
+// piny pro tlacitka
 const int PIN_NEXT  = 2;
 const int PIN_START = 3;
 const int PIN_STOP  = 4;
@@ -15,7 +16,7 @@ enum SystemState { IDLE, RUNNING, STOPPING };
 SystemState systemState = IDLE;
 bool stopRequested = false;
 
-int selectedWorkoutIndex = 0; // Který workout v seznamu je právě vybraný
+int selectedWorkoutIndex = 0; // vybrany workout ze seznamu
 
 // ======= DEKLARACE ======
 void processCommand(String cmd);
@@ -23,25 +24,26 @@ void runWorkout(const Workout& w);
 void emitState();
 void emitWorkouts();
 void countdownPhase(const char* phase, int seconds);
-void checkButtons(); // Nová funkce pro čtení tlačítek
+void checkButtons(); //cteni tlacitek
 
 // ================== SETUP =====================
 void setup() {
   Serial.begin(9600);
   buzzerInit(BUZZER_PIN);
 
-  // Nastavení tlačítek s vnitřním pull-up rezistorem
+  // nastaveni tlacitek
   pinMode(PIN_NEXT, INPUT_PULLUP);
   pinMode(PIN_START, INPUT_PULLUP);
   pinMode(PIN_STOP, INPUT_PULLUP);
 
   lcdInit();
   
-  // Po startu ukážeme první workout v seznamu
-  lcdShowWorkout(workouts[selectedWorkoutIndex].name, 0, workouts[selectedWorkoutIndex].rounds);
-  lcdShowPhase("READY", 0); 
-  
-  emitState();
+  lcdShowCustomScreen(
+    "********************",
+    "POT SETRI KREV PICO!",
+    "   -press start-    ",
+    "********************"
+  );
 }
 
 // ================== LOOP ======================
@@ -94,7 +96,7 @@ void checkButtons() {
     }
   }
 
-  // Tlačítko STOP (pouze v IDLE pro reset nebo informaci)
+  
   if (digitalRead(PIN_STOP) == LOW) {
     if (systemState == RUNNING) {
       stopRequested = true;
@@ -124,7 +126,6 @@ void processCommand(String cmd) {
   }
 
   // ----- STOP -----
-  // Opraveno z "RUN" na "STOP", aby to dávalo smysl
   if (cmd.startsWith("STOP")) {
     if (systemState == RUNNING) {
       stopRequested = true;
@@ -240,7 +241,7 @@ void emitWorkouts() {
 // ================== RUN WORKOUT ===================
 void runWorkout(const Workout& w) {
   lcdShowRunning();
-  delay(1000); // Krátká pauza pro zobrazení stavu RUNNING
+  delay(1000); 
 
   beepStart(); 
   lcdRoundsTotal = w.rounds;
@@ -274,7 +275,7 @@ void runWorkout(const Workout& w) {
     lcdShowDone();
   }
   
-  delay(2000); // Necháme výsledek chvíli na displeji
+  delay(2000); // vysledek je dele na displeji
 }
 
 //============ COUNTDOWN =========
@@ -287,21 +288,21 @@ void countdownPhase(const char* phase, int seconds) {
   lcdPhase = phase;
   beepTransition(); 
   
-  for (int i = seconds; i >= 0; i--) { // i >= 0 aby se ukázala i nula
+  for (int i = seconds; i >= 0; i--) { 
     if (stopRequested) return;
 
     lcdSeconds = i;
     Serial.print("TICK ");
     Serial.println(i);
     
-    // Voláme zobrazení fáze
+    // volani zobrazeni faze
     lcdShowPhase(phase, i);
 
     if (i <= 3 && i > 0) {
       beepTransition();
     }
 
-    // Čekání 1 sekundu s kontrolou sériové linky
+    // cekani 1s s kontrolou seriove linky
     unsigned long startMs = millis();
     while (millis() - startMs < 1000) {
       // Kontrola Serial STOPU
@@ -311,7 +312,7 @@ void countdownPhase(const char* phase, int seconds) {
         if (cmd == "STOP") { stopRequested = true; systemState = STOPPING; return; }
       }
       
-      // Kontrola fyzického STOP tlačítka
+      // kontrola stop tlacitka
       if (digitalRead(PIN_STOP) == LOW) {
         stopRequested = true;
         systemState = STOPPING;
