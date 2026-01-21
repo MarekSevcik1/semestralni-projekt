@@ -2,65 +2,68 @@
 
 **Autor:** Marek Ševčík  
 **Studijní obor:** Kybernetická bezpečnost — Univerzita obrany  
-**Rok:** 2025
+**Rok:** 2026
 
 ---
 
-## Přehled projektu
-Cílem projektu je vytvořit malé embedded zařízení („workoutové hodiny“) řízené mikrokontrolérem (Raspberry Pi Pico), které bude vykonávat intervalové tréninky (např. Tabata, EMOM, custom workouts). Zařízení produkuje zvukovou zpětnou vazbu (pípnutí) pro označení začátku a konce pracovního intervalu a přestávky. Konfigurace workoutů probíhá přes uživatelské rozhraní běžící na PC, které pošle zvolený plán do zařízení přes USB (sériová komunikace).
+## 1. Přehled projektu
+Cílem projektu je vytvořit samostatné embedded zařízení („workoutové hodiny“) postavené na platformě **Arduino**. Zařízení umožňuje provádět intervalové tréninky (např. Tabata, HIIT) s vizuální zpětnou vazbou na **LCD 20x4** a zvukovou signalizací pomocí bzučáku. 
 
-Projekt ukazuje:
-- Embedded vývoj (C/C++ pro Raspberry Pi Pico)
-- Desktopovou C++ aplikaci (UI) pro výběr a správu workoutů
-- Komunikační protokol mezi PC a zařízením (JSON přes USB/Serial)
-- Základy návrhu hardware (buzzer, tranzistor, napájení)
+Zařízení je navrženo jako **hybridní**:
+* **Autonomní režim:** Ovládání pomocí fyzických tlačítek a výběr z přednastavených workoutů uložených v paměti (nezávislost na PC).
+* **Sériový režim:** Komunikace s PC (Python FastAPI server) přes USB pro vzdálenou správu a monitoring stavu - není zcela hotov a 100% funkční.
 
 ---
 
-## Funkce
-- Výběr workoutu z přednastavených plánů nebo možnost nahrát vlastní plán.
-- Generování pípnutí pro začátek/ukončení `work` a `rest` intervalů.
-- Uložení workoutů jako JSON soubory.
-- Sériová komunikace PC ↔ Pico (JSON payload).
-- Možnost přidat jednoduché vizuální potvrzení v PC UI (např. odpočet).
+## 2. Funkce a vlastnosti
+* **Víceúrovňové menu:** Pohodlné listování v seznamu workoutů pomocí tlačítek.
+* **Stavový automat:** Implementace stavů `IDLE`, `RUNNING` a `STOPPING` pro robustní řízení běhu.
+* **Zvuková signalizace:** Akustické upozornění na začátek/konec fáze a odpočet posledních 3 sekund.
+* **Optimalizovaný vizuální výstup:** LCD displej zobrazuje název cviku, aktuální kolo, zbývající čas a fázi (WORK/REST).
+* **Customizable Loading Screen:** Snadno upravitelná úvodní obrazovka s možností ASCII grafiky.
 
 ---
 
-## Hardware
-- **Raspberry Pi Pico** .  
-- **Active buzzer module 3.5–5.5 V**   
-- **NPN tranzistor** (2N2222 / BC337) a **rezistor 1 kΩ** pro řízení bzučáku bezpečně z GPIO.  
-- **Breadboard + dupont kabely**, **USB kabel**, **header piny**.  
+## 3. Hardware
+* **Mikrokontrolér:** Arduino Uno.
+* **Displej:** LCD 20x4 s I2C převodníkem (0x27).
+* **Ovládací prvky:** 3x mikrospínač (PBS-12B) zapojený jako `INPUT_PULLUP`.
+* **Akustický výstup:** Active Buzzer (připojen na digitální pin).
+* **Napájení:** 5V přes USB (Powerbanka nebo PC).
 
-> Poznámka: Proč active buzzer? Je jednodušší — stačí ho napájet a pípne. 
-
----
-
-## Software — architektura
-### PC (Desktop UI)
-- Jazyk: C++ (Qt / ImGui / nebo konzolová verze pro rychlý prototyp)
-- Funkce:
-  - načítání a editace workout JSON (`work_time`, `rest_time`, `rounds`, `name`)
-  - volba workoutu a odeslání do zařízení
-  - zobrazit aktuální stav (připojeno / běží / pauza)
-- Komunikace: sériový port (USB CDC) — JSON zprávy
-
-### Device (Raspberry Pi Pico)
-- Jazyk: C/C++ (Pico SDK) 
-- Funkce:
-  - čtení JSON konfigurace ze sériového portu
-  - parsování polí: `name`, `work_time`, `rest_time`, `rounds`
-  - časovač pro intervaly (přes hardware timer nebo software)
-  - řízení PWM výstupu na pinu připojeném k buzzeru
-  - echo / logging přes sériový port (pro debug)
+### Zapojení pinů (Pinout)
+| Komponenta | Pin Arduina | Poznámka |
+| :--- | :--- | :--- |
+| **LCD (SDA)** | A4 | Datová linka I2C |
+| **LCD (SCL)** | A5 | Hodinová linka I2C |
+| **Buzzer** | 10 | PWM / Digitální výstup |
+| **Button NEXT** | 2 | Internal Pull-up (spíná proti GND) |
+| **Button START** | 3 | Internal Pull-up (spíná proti GND) |
+| **Button STOP** | 4 | Internal Pull-up (spíná proti GND) |
 
 ---
 
-## Formát JSON (příklad)
-```json
-{
-  "name": "Tabata",
-  "work_time": 20,
-  "rest_time": 10,
-  "rounds": 8
-}
+## 4. Software — Architektura
+
+### Arduino (C++)
+Kód je strukturován do modulů pro přehlednost a snadnou údržbu:
+* `WorkoutTimer.ino`: Hlavní smyčka, zpracování příkazů a řízení stavů.
+* `lcd.cpp / .h`: Správa displeje, funkce pro statické i dynamické vykreslování.
+* `workouts.cpp / .h`: Databáze tréninkových plánů (statické pole struktur) a API pro správu.
+* `buzzer.cpp / .h`: Definice tónů a délky pípání.
+
+### Python (Reference Server)
+* **Framework:** FastAPI + Uvicorn.
+* **Komunikace:** Knihovna `pyserial`.
+* **Účel:** Slouží jako vzdálené rozhraní pro monitoring a logování průběhu tréninku.
+
+---
+
+## 5. Ukázka datové struktury (Workout)
+```cpp
+struct Workout {
+  char name[20];       // Název workoutu
+  int workSeconds;     // Doba zátěže
+  int restSeconds;     // Doba odpočinku
+  int rounds;          // Počet kol
+};
