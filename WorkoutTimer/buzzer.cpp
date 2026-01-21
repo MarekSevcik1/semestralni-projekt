@@ -15,6 +15,7 @@ void beep(int durationMs) {
   digitalWrite(buzzerPin, LOW);
 }
 
+//davkrat pipnuti na zacatku
 void beepStart() {
   beep(300);
   delay(100);
